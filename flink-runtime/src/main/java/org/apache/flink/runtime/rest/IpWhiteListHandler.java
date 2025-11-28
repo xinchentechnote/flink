@@ -18,23 +18,67 @@
 
 package org.apache.flink.runtime.rest;
 
-
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelHandlerContext;
 import org.apache.flink.shaded.netty4.io.netty.channel.SimpleChannelInboundHandler;
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpObject;
+import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpRequest;
+import org.apache.flink.shaded.netty4.io.netty.util.AttributeKey;
+import org.apache.flink.shaded.netty4.io.netty.util.ReferenceCountUtil;
 
+import java.net.InetSocketAddress;
+
+/** 白名单处理类. */
 public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     private IpWhiteListConfiguration configuration;
 
+    private static final AttributeKey<Boolean> IP_VERIFIED_KEY = AttributeKey.valueOf("ipVerified");
+
+    private boolean isAllowedIp(ChannelHandlerContext ctx) {
+        Boolean ipVerified = ctx.channel().attr(IP_VERIFIED_KEY).get();
+        if (null != ipVerified && ipVerified) {
+            return true;
+        }
+        InetSocketAddress remoteAddr = (InetSocketAddress) ctx.channel().remoteAddress();
+        return configuration.isAllowed(remoteAddr.getHostName());
+    }
+
+    private boolean isAllowedIp(ChannelHandlerContext ctx, HttpRequest request) {
+        Boolean ipVerified = ctx.channel().attr(IP_VERIFIED_KEY).get();
+        if (null != ipVerified && ipVerified) {
+            return true;
+        }
+        InetSocketAddress remoteAddr = (InetSocketAddress) ctx.channel().remoteAddress();
+        return configuration.isAllowed(remoteAddr.getHostName());
+    }
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-
+        if (configuration.isEnable()) {
+            if (!isAllowedIp(ctx)) {
+                // TODO response 403 to client
+                return;
+            }
+        }
+        ctx.channel().attr(IP_VERIFIED_KEY).set(true);
     }
 
     @Override
     public void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
-
+        if (configuration.isEnable()) {
+            Boolean ipVerified = ctx.channel().attr(IP_VERIFIED_KEY).get();
+            if (null == ipVerified || !ipVerified) {
+                ReferenceCountUtil.release(msg);
+                return;
+            }
+            if (msg instanceof HttpRequest) {
+                if (!isAllowedIp(ctx, (HttpRequest) msg)) {
+                    // TODO response 403 to client
+                    return;
+                }
+            }
+            // 传递消息到下一个处理器
+            ctx.fireChannelRead(ReferenceCountUtil.retain(msg));
+        }
     }
-
 }
