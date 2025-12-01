@@ -22,6 +22,10 @@ public class IpWhiteListConfiguration {
                     .noDefaultValue()
                     .withDescription("default empty means disable ip white list.");
 
+    public static IpWhiteListConfiguration from(Configuration configuration) {
+        return new IpWhiteListConfiguration(configuration);
+    }
+
     public IpWhiteListConfiguration(Configuration configuration) {
         Optional<String> ipWhiteList = configuration.getOptional(IP_WHITE_LIST_KEY);
         ipWhiteList.ifPresent(

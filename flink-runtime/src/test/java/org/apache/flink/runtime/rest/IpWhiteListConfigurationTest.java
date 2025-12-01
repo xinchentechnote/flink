@@ -19,8 +19,8 @@ public class IpWhiteListConfigurationTest {
     @Test
     public void testEmptyConfiguration() {
         Configuration config = new Configuration();
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
-
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
+        assertFalse(ipWhiteListConfig.isEnable());
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.1"));
         assertTrue(ipWhiteListConfig.isAllowed("10.0.0.1"));
     }
@@ -29,7 +29,8 @@ public class IpWhiteListConfigurationTest {
     public void testExactIpMatch() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "192.168.1.1,10.0.0.1");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
+        assertTrue(ipWhiteListConfig.isEnable());
 
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.1"));
         assertTrue(ipWhiteListConfig.isAllowed("10.0.0.1"));
@@ -41,7 +42,7 @@ public class IpWhiteListConfigurationTest {
     public void testWildcardMatch() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "192.168.*.*,10.*.*.*");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.1"));
         assertTrue(ipWhiteListConfig.isAllowed("192.168.100.200"));
@@ -56,7 +57,7 @@ public class IpWhiteListConfigurationTest {
     public void testCidrMatch() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "192.168.1.0/24,10.0.0.0/8");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.1"));
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.255"));
@@ -73,7 +74,7 @@ public class IpWhiteListConfigurationTest {
         config.setString(
                 IpWhiteListConfiguration.IP_WHITE_LIST_KEY,
                 "192.168.1.100,192.168.2.*,192.168.3.0/24");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.100"));
         assertFalse(ipWhiteListConfig.isAllowed("192.168.1.101"));
@@ -91,7 +92,7 @@ public class IpWhiteListConfigurationTest {
     public void testInvalidIpAddress() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "192.168.1.1");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertFalse(ipWhiteListConfig.isAllowed("invalid-ip"));
         assertFalse(ipWhiteListConfig.isAllowed("192.168.1.256"));
@@ -102,7 +103,7 @@ public class IpWhiteListConfigurationTest {
     public void testInvalidCidrRule() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "192.168.1.1/33");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
     }
 
     @Test
@@ -110,7 +111,7 @@ public class IpWhiteListConfigurationTest {
         Configuration config = new Configuration();
         config.setString(
                 IpWhiteListConfiguration.IP_WHITE_LIST_KEY, "0.0.0.0,255.255.255.255,127.0.0.1");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertTrue(ipWhiteListConfig.isAllowed("0.0.0.0"));
         assertTrue(ipWhiteListConfig.isAllowed("255.255.255.255"));
@@ -121,7 +122,7 @@ public class IpWhiteListConfigurationTest {
     public void testWhitespaceHandling() {
         Configuration config = new Configuration();
         config.setString(IpWhiteListConfiguration.IP_WHITE_LIST_KEY, " 192.168.1.1 , 10.0.0.1 ");
-        ipWhiteListConfig = new IpWhiteListConfiguration(config);
+        ipWhiteListConfig = IpWhiteListConfiguration.from(config);
 
         assertTrue(ipWhiteListConfig.isAllowed("192.168.1.1"));
         assertTrue(ipWhiteListConfig.isAllowed("10.0.0.1"));

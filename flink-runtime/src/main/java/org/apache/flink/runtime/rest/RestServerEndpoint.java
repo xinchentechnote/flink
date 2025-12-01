@@ -46,6 +46,7 @@ import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelHandler;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelInboundHandler;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelInitializer;
+import org.apache.flink.shaded.netty4.io.netty.channel.ChannelPipeline;
 import org.apache.flink.shaded.netty4.io.netty.channel.EventLoopGroup;
 import org.apache.flink.shaded.netty4.io.netty.channel.nio.NioEventLoopGroup;
 import org.apache.flink.shaded.netty4.io.netty.channel.socket.SocketChannel;
@@ -111,11 +112,14 @@ public abstract class RestServerEndpoint implements RestService {
 
     private final List<InboundChannelHandlerFactory> inboundChannelHandlerFactories;
 
+    private IpWhiteListConfiguration ipWhiteListConfiguration;
+
     public RestServerEndpoint(Configuration configuration)
             throws IOException, ConfigurationException {
         Preconditions.checkNotNull(configuration);
         RestServerEndpointConfiguration restConfiguration =
                 RestServerEndpointConfiguration.fromConfiguration(configuration);
+        this.ipWhiteListConfiguration = IpWhiteListConfiguration.from(configuration);
         Preconditions.checkNotNull(restConfiguration);
 
         this.configuration = configuration;
@@ -184,7 +188,8 @@ public abstract class RestServerEndpoint implements RestService {
 
             handlers = initializeHandlers(restAddressFuture);
 
-            /* sort the handlers such that they are ordered the following:
+            /*
+             * sort the handlers such that they are ordered the following:
              * /jobs
              * /jobs/overview
              * /jobs/:jobid
@@ -204,19 +209,20 @@ public abstract class RestServerEndpoint implements RestService {
                             RouterHandler handler = new RouterHandler(router, responseHeaders);
 
                             // SSL should be the first handler in the pipeline
+                            ChannelPipeline pipeline = ch.pipeline();
                             if (isHttpsEnabled()) {
-                                ch.pipeline()
-                                        .addLast(
-                                                "ssl",
-                                                new RedirectingSslHandler(
-                                                        restAddress,
-                                                        restAddressFuture,
-                                                        sslHandlerFactory));
+                                pipeline.addLast(
+                                        "ssl",
+                                        new RedirectingSslHandler(
+                                                restAddress, restAddressFuture, sslHandlerFactory));
                             }
 
-                            ch.pipeline()
-                                    .addLast(new HttpServerCodec())
-                                    .addLast(new FileUploadHandler(uploadDir))
+                            pipeline.addLast(new HttpServerCodec());
+                            if (ipWhiteListConfiguration.isEnable()) {
+                                pipeline.addLast(new IpWhiteListHandler(ipWhiteListConfiguration));
+                            }
+
+                            pipeline.addLast(new FileUploadHandler(uploadDir))
                                     .addLast(
                                             new FlinkHttpObjectAggregator(
                                                     maxContentLength, responseHeaders));
@@ -226,12 +232,11 @@ public abstract class RestServerEndpoint implements RestService {
                                 Optional<ChannelHandler> channelHandler =
                                         factory.createHandler(configuration, responseHeaders);
                                 if (channelHandler.isPresent()) {
-                                    ch.pipeline().addLast(channelHandler.get());
+                                    pipeline.addLast(channelHandler.get());
                                 }
                             }
 
-                            ch.pipeline()
-                                    .addLast(new ChunkedWriteHandler())
+                            pipeline.addLast(new ChunkedWriteHandler())
                                     .addLast(handler.getName(), handler)
                                     .addLast(new PipelineErrorHandler(log, responseHeaders));
                         }
@@ -616,8 +621,10 @@ public abstract class RestServerEndpoint implements RestService {
             final List<Tuple2<RestHandlerSpecification, ChannelInboundHandler>> handlers) {
         // check for all handlers that
         // 1) the instance is only registered once
-        // 2) only 1 handler is registered for each endpoint (defined by (version, method, url))
-        // technically the first check is redundant since a duplicate instance also returns the same
+        // 2) only 1 handler is registered for each endpoint (defined by (version,
+        // method, url))
+        // technically the first check is redundant since a duplicate instance also
+        // returns the same
         // headers which
         // should fail the second check, but we get a better error message
         final Set<String> uniqueEndpoints = new HashSet<>();
