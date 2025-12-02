@@ -92,7 +92,8 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
             }
             if (msg instanceof HttpRequest) {
                 if (!isAllowedIp(ctx, (HttpRequest) msg)) {
-                    InetAddress addr = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+                    InetAddress addr =
+                            ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
                     // response 403 to client
                     sendResponseAndClose(
                             ctx,
@@ -113,10 +114,11 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
     }
 
     private FullHttpResponse buildResponse(String content, HttpResponseStatus status) {
-        FullHttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1,
-                status,
-                Unpooled.copiedBuffer(content, StandardCharsets.UTF_8));
+        FullHttpResponse response =
+                new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1,
+                        status,
+                        Unpooled.copiedBuffer(content, StandardCharsets.UTF_8));
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
         response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
