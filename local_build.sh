@@ -16,8 +16,17 @@
 # limitations under the License.
 #
 
-export JAVA_HOME=/usr/java/jdk1.8.0_271
+# https://nightlies.apache.org/flink/flink-docs-master/zh/docs/flinkdev/building/
+export JAVA_HOME=/usr/java/jdk-11.0.9
 export PATH=$JAVA_HOME/bin:$PATH
 export MAVEN_HOME=$HOME/software/apache-maven-3.8.6
 export PATH=$MAVEN_HOME/bin:$PATH
-mvn package -DskipTests
+export MAVEN_OPTS="-Xmx8g -XX:+TieredCompilation -XX:TieredStopAtLevel=1"
+mvn --version
+mvn clean
+mvn generate-sources -pl flink-table/flink-sql-parser -DskipTests
+mvn generate-sources -pl flink-table/flink-table-planner -DskipTests
+mvn generate-sources -pl flink-table/flink-sql-gateway -DskipTests
+mvn install -DskipTests -pl flink-formats -DskipTests
+mvn install -DskipTests -pl flink-table/flink-sql-gateway -DskipTests
+mvn install -DskipTests -Dfast -Pskip-webui-build

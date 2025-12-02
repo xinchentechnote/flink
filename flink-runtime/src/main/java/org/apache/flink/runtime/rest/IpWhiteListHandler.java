@@ -33,6 +33,7 @@ import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpVersion;
 import org.apache.flink.shaded.netty4.io.netty.util.AttributeKey;
 import org.apache.flink.shaded.netty4.io.netty.util.ReferenceCountUtil;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
@@ -53,7 +54,7 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
             return true;
         }
         InetSocketAddress remoteAddr = (InetSocketAddress) ctx.channel().remoteAddress();
-        return configuration.isAllowed(remoteAddr.getHostName());
+        return configuration.isAllowed(remoteAddr.getAddress().getHostAddress());
     }
 
     private boolean isAllowedIp(ChannelHandlerContext ctx, HttpRequest request) {
@@ -62,15 +63,19 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
             return true;
         }
         InetSocketAddress remoteAddr = (InetSocketAddress) ctx.channel().remoteAddress();
-        return configuration.isAllowed(remoteAddr.getHostName());
+        return configuration.isAllowed(remoteAddr.getAddress().getHostAddress());
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         if (configuration.isEnable()) {
             if (!isAllowedIp(ctx)) {
-                // TODO response 403 to client
-                sendResponseAndClose(ctx, "Ip not allowed.", HttpResponseStatus.FORBIDDEN);
+                // response 403 to client
+                InetAddress addr = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+                sendResponseAndClose(
+                        ctx,
+                        "Ip [" + addr.getHostAddress() + "] not allowed.",
+                        HttpResponseStatus.FORBIDDEN);
                 return;
             }
         }
@@ -87,8 +92,12 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
             }
             if (msg instanceof HttpRequest) {
                 if (!isAllowedIp(ctx, (HttpRequest) msg)) {
-                    // TODO response 403 to client
-                    sendResponseAndClose(ctx, "Ip not allowed.", HttpResponseStatus.FORBIDDEN);
+                    InetAddress addr = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+                    // response 403 to client
+                    sendResponseAndClose(
+                            ctx,
+                            "Ip [" + addr.getHostAddress() + "] not allowed.",
+                            HttpResponseStatus.FORBIDDEN);
                     return;
                 }
             }
@@ -104,11 +113,10 @@ public class IpWhiteListHandler extends SimpleChannelInboundHandler<HttpObject> 
     }
 
     private FullHttpResponse buildResponse(String content, HttpResponseStatus status) {
-        FullHttpResponse response =
-                new DefaultFullHttpResponse(
-                        HttpVersion.HTTP_1_1,
-                        status,
-                        Unpooled.copiedBuffer(content, StandardCharsets.UTF_8));
+        FullHttpResponse response = new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1,
+                status,
+                Unpooled.copiedBuffer(content, StandardCharsets.UTF_8));
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8");
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
         response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
